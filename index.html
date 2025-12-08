@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的小说站</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.8;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+        .header {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .book-list {
+            display: grid;
+            gap: 1.5rem;
+        }
+        .book {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+        .book:hover {
+            transform: translateY(-2px);
+            transition: transform 0.3s;
+        }
+        footer {
+            margin-top: 3rem;
+            text-align: center;
+            color: #666;
+            padding: 1rem;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📚 小说阅读站</h1>
+        <p>随时随地，畅享阅读</p>
+    </div>
+    
+    <div class="book-list">
+        <div class="book" onclick="window.location.href='chapter1.html'">
+            <h3>《星辰变》</h3>
+            <p>作者：我吃西红柿</p>
+            <p>状态：连载中 | 最新章节：第125章</p>
+        </div>
+        <div class="book" onclick="window.location.href='book2.html'">
+            <h3>《凡人修仙传》</h3>
+            <p>作者：忘语</p>
+            <p>状态：已完结 | 共1000章</p>
+        </div>
+    </div>
+    
+    <footer>
+        <p>© 2024 我的小说站 | 使用 GitHub Pages 部署</p>
+        <p>访问地址：https://你的用户名.github.io/novel-website</p>
+    </footer>
+</body>
+</html>
