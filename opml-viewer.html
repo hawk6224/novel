@@ -3,143 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OPML小说目录浏览器</title>
+    <title>带语音朗读的小说阅读器</title>
     <style>
-        :root {
-            --primary-color: #3498db;
-            --secondary-color: #2c3e50;
-            --bg-color: #f8f9fa;
-            --text-color: #333;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
-            background: var(--bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
+        .speech-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
             background: white;
-            border-radius: 10px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            padding: 30px;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #eee;
-        }
-        
-        .novel-info {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        
-        .chapter-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-        
-        .chapter-item {
-            background: #f8f9fa;
             padding: 15px;
-            border-radius: 8px;
-            border-left: 4px solid var(--primary-color);
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .speech-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            background: #3498db;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
             transition: all 0.3s;
         }
         
-        .chapter-item:hover {
-            transform: translateX(5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        .speech-btn:hover {
+            background: #2980b9;
+            transform: scale(1.1);
         }
         
-        .chapter-link {
-            color: var(--secondary-color);
-            text-decoration: none;
-            display: block;
-            font-size: 16px;
-            font-weight: 500;
+        .speech-btn.active {
+            background: #e74c3c;
+            animation: pulse 1.5s infinite;
         }
         
-        .chapter-link:hover {
-            color: var(--primary-color);
-        }
-        
-        .chapter-id {
-            color: #666;
-            font-size: 14px;
-            margin-top: 5px;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-        }
-        
-        .error {
-            color: #e74c3c;
-            background: #ffeaea;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-        
-        .controls {
+        .speech-rate {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
+            gap: 5px;
         }
         
-        .control-btn {
-            padding: 10px 20px;
-            background: var(--primary-color);
-            color: white;
-            border: none;
+        .rate-btn {
+            padding: 5px 10px;
+            border: 1px solid #3498db;
+            background: white;
+            color: #3498db;
             border-radius: 5px;
             cursor: pointer;
+        }
+        
+        .rate-btn.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        .reading-highlight {
+            background: #fff9c4 !important;
             transition: background 0.3s;
-        }
-        
-        .control-btn:hover {
-            background: #2980b9;
-        }
-        
-        .search-box {
-            flex: 1;
-            min-width: 200px;
-        }
-        
-        .search-input {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-        
-        .stats {
-            margin-top: 20px;
-            color: #666;
-            font-size: 14px;
         }
     </style>
 </head>
@@ -165,6 +88,27 @@
         <div class="stats" id="stats"></div>
     </div>
     
+    <!-- 语音控制面板 -->
+    <div class="speech-controls" id="speechControls" style="display: none;">
+        <button class="speech-btn" id="speechPlayBtn" onclick="toggleChapterSpeech()">▶️</button>
+        <button class="speech-btn" onclick="stopChapterSpeech()">⏹️</button>
+        
+        <div class="speech-rate">
+            <button class="rate-btn active" onclick="setSpeechRate(0.8)">0.8x</button>
+            <button class="rate-btn" onclick="setSpeechRate(1.0)">1.0x</button>
+            <button class="rate-btn" onclick="setSpeechRate(1.2)">1.2x</button>
+            <button class="rate-btn" onclick="setSpeechRate(1.5)">1.5x</button>
+        </div>
+        
+        <select id="chapterVoiceSelect" onchange="changeChapterVoice(this.value)">
+            <option value="">选择语音</option>
+        </select>
+        
+        <div id="speechStatus" style="font-size: 12px; color: #666; min-width: 80px;">
+            就绪
+        </div>
+    </div>
+
     <script>
         class OPMLViewer {
             constructor() {
@@ -260,12 +204,12 @@
                 
                 // 提取章节
                 for (const outline of outlines) {
-                    if (outline.getAttribute('type') === 'chapter') {
+                    if (outline.getAttribute('type') === 'file') {
                         const chapter = {
                             id: outline.getAttribute('chapterId') || '',
                             title: outline.getAttribute('text') || '',
                             url: outline.getAttribute('url') || '',
-                            filename: outline.getAttribute('filename') || ''
+                            filename: outline.getAttribute('text') || ''
                         };
                         
                         if (chapter.title && chapter.url) {
@@ -400,6 +344,264 @@
                 document.querySelector('.search-input').focus();
             }
         });
+
+
+
+        class ChapterSpeech {
+            constructor() {
+                this.speech = window.speechSynthesis;
+                this.currentUtterance = null;
+                this.currentParagraphs = [];
+                this.currentIndex = 0;
+                this.isPlaying = false;
+                this.rate = 1.0;
+                this.voices = [];
+                this.selectedVoice = null;
+                
+                this.init();
+            }
+            
+            async init() {
+                await this.loadVoices();
+                this.speech.onvoiceschanged = () => this.loadVoices();
+            }
+            
+            loadVoices() {
+                return new Promise((resolve) => {
+                    const voices = this.speech.getVoices();
+                    this.voices = voices;
+                    
+                    const select = document.getElementById('chapterVoiceSelect');
+                    select.innerHTML = '<option value="">选择语音</option>';
+                    
+                    // 优先中文语音
+                    const chineseVoices = voices.filter(v => 
+                        v.lang.startsWith('zh') || 
+                        v.name.toLowerCase().includes('chinese')
+                    );
+                    
+                    chineseVoices.forEach((voice, index) => {
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = `${voice.name} (${voice.lang})`;
+                        select.appendChild(option);
+                    });
+                    
+                    if (chineseVoices.length > 0) {
+                        this.selectedVoice = chineseVoices[0];
+                        select.value = voices.indexOf(chineseVoices[0]);
+                    }
+                    
+                    resolve();
+                });
+            }
+            
+            async speakChapter(url) {
+                try {
+                    // 加载章节内容
+                    const response = await fetch(url);
+                    const text = await response.text();
+                    
+                    // 分割成段落
+                    this.currentParagraphs = text.split('\n').filter(p => p.trim());
+                    this.currentIndex = 0;
+                    
+                    // 开始朗读
+                    this.startReading();
+                    
+                    // 显示控制面板
+                    document.getElementById('speechControls').style.display = 'flex';
+                    
+                } catch (error) {
+                    console.error('加载章节失败:', error);
+                    this.updateStatus('加载失败');
+                }
+            }
+            
+            startReading() {
+                if (this.currentIndex >= this.currentParagraphs.length) return;
+                
+                const text = this.currentParagraphs[this.currentIndex];
+                if (!text) {
+                    this.nextParagraph();
+                    return;
+                }
+                
+                this.stopReading();
+                
+                this.currentUtterance = new SpeechSynthesisUtterance(text);
+                this.currentUtterance.rate = this.rate;
+                this.currentUtterance.pitch = 1;
+                this.currentUtterance.volume = 1;
+                this.currentUtterance.lang = 'zh-CN';
+                
+                if (this.selectedVoice) {
+                    this.currentUtterance.voice = this.selectedVoice;
+                }
+                
+                // 高亮当前朗读的文本
+                this.highlightCurrentText(text);
+                
+                this.currentUtterance.onstart = () => {
+                    this.isPlaying = true;
+                    this.updateUI();
+                    this.updateStatus('朗读中...');
+                };
+                
+                this.currentUtterance.onend = () => {
+                    this.isPlaying = false;
+                    this.nextParagraph();
+                    this.updateUI();
+                };
+                
+                this.currentUtterance.onerror = () => {
+                    this.isPlaying = false;
+                    this.updateUI();
+                    this.updateStatus('出错');
+                };
+                
+                this.speech.speak(this.currentUtterance);
+            }
+            
+            stopReading() {
+                if (this.speech.speaking) {
+                    this.speech.cancel();
+                    this.isPlaying = false;
+                    this.clearHighlight();
+                    this.updateUI();
+                    this.updateStatus('已停止');
+                }
+            }
+            
+            toggleReading() {
+                if (this.isPlaying) {
+                    if (this.speech.paused) {
+                        this.speech.resume();
+                        this.isPlaying = true;
+                        this.updateStatus('继续');
+                    } else {
+                        this.speech.pause();
+                        this.isPlaying = false;
+                        this.updateStatus('已暂停');
+                    }
+                } else {
+                    this.startReading();
+                }
+            }
+            
+            nextParagraph() {
+                if (this.currentIndex < this.currentParagraphs.length - 1) {
+                    this.currentIndex++;
+                    setTimeout(() => this.startReading(), 100);
+                } else {
+                    this.updateStatus('朗读完成');
+                    this.currentIndex = 0;
+                }
+            }
+            
+            prevParagraph() {
+                if (this.currentIndex > 0) {
+                    this.currentIndex--;
+                    this.stopReading();
+                    this.startReading();
+                }
+            }
+            
+            setRate(newRate) {
+                this.rate = newRate;
+                
+                // 更新按钮状态
+                document.querySelectorAll('.rate-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                event.target.classList.add('active');
+                
+                // 如果正在朗读，更新速率
+                if (this.currentUtterance && this.isPlaying) {
+                    this.speech.cancel();
+                    this.currentUtterance.rate = newRate;
+                    this.speech.speak(this.currentUtterance);
+                }
+            }
+            
+            changeVoice(voiceIndex) {
+                if (voiceIndex !== '' && this.voices[voiceIndex]) {
+                    this.selectedVoice = this.voices[voiceIndex];
+                    
+                    if (this.currentUtterance && this.isPlaying) {
+                        this.speech.cancel();
+                        this.currentUtterance.voice = this.selectedVoice;
+                        this.speech.speak(this.currentUtterance);
+                    }
+                }
+            }
+            
+            highlightCurrentText(text) {
+                // 清除之前的高亮
+                this.clearHighlight();
+                
+                // 查找并高亮包含此文本的元素
+                const elements = document.querySelectorAll('p, div, span');
+                elements.forEach(el => {
+                    if (el.textContent.includes(text.trim())) {
+                        el.classList.add('reading-highlight');
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                });
+            }
+            
+            clearHighlight() {
+                document.querySelectorAll('.reading-highlight').forEach(el => {
+                    el.classList.remove('reading-highlight');
+                });
+            }
+            
+            updateUI() {
+                const btn = document.getElementById('speechPlayBtn');
+                if (this.isPlaying) {
+                    btn.innerHTML = '⏸️';
+                    btn.classList.add('active');
+                } else {
+                    btn.innerHTML = '▶️';
+                    btn.classList.remove('active');
+                }
+            }
+            
+            updateStatus(message) {
+                document.getElementById('speechStatus').textContent = message;
+            }
+        }
+        
+        // 创建语音实例
+        const chapterSpeech = new ChapterSpeech();
+        
+        // 全局函数
+        window.toggleChapterSpeech = () => chapterSpeech.toggleReading();
+        window.stopChapterSpeech = () => chapterSpeech.stopReading();
+        window.setSpeechRate = (rate) => chapterSpeech.setRate(rate);
+        window.changeChapterVoice = (voiceIndex) => chapterSpeech.changeVoice(voiceIndex);
+        
+        // 在你的章节点击事件中添加语音功能
+        function loadChapterWithSpeech(url, title) {
+            // 原来的加载章节逻辑...
+            
+            // 添加语音朗读按钮
+            const contentDiv = document.getElementById('chapterContent');
+            const speechBtn = document.createElement('button');
+            speechBtn.innerHTML = '🎤 语音朗读本章';
+            speechBtn.style.cssText = `
+                padding: 10px 20px;
+                background: #3498db;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                margin: 20px 0;
+            `;
+            speechBtn.onclick = () => chapterSpeech.speakChapter(url);
+            
+            contentDiv.parentNode.insertBefore(speechBtn, contentDiv.nextSibling);
+        }
     </script>
 </body>
 </html>
