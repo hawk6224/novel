@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OPML小说目录浏览器</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --bg-color: #f8f9fa;
+            --text-color: #333;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .novel-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .chapter-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .chapter-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary-color);
+            transition: all 0.3s;
+        }
+        
+        .chapter-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .chapter-link {
+            color: var(--secondary-color);
+            text-decoration: none;
+            display: block;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .chapter-link:hover {
+            color: var(--primary-color);
+        }
+        
+        .chapter-id {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .error {
+            color: #e74c3c;
+            background: #ffeaea;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .control-btn {
+            padding: 10px 20px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .control-btn:hover {
+            background: #2980b9;
+        }
+        
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        .stats {
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 小说目录浏览器</h1>
+            <p>自动处理编码问题，显示正确中文</p>
+        </div>
+        
+        <div class="controls">
+            <button class="control-btn" onclick="loadOPML()">重新加载</button>
+            <button class="control-btn" onclick="exportList()">导出清单</button>
+            <div class="search-box">
+                <input type="text" class="search-input" placeholder="搜索章节..." oninput="searchChapters(this.value)">
+            </div>
+        </div>
+        
+        <div id="contentArea">
+            <div class="loading">正在加载小说目录...</div>
+        </div>
+        
+        <div class="stats" id="stats"></div>
+    </div>
+    
+    <script>
+        class OPMLViewer {
+            constructor() {
+                this.chapters = [];
+                this.filteredChapters = [];
+                this.init();
+            }
+            
+            async init() {
+                await this.loadOPML();
+            }
+            
+            async loadOPML() {
+                const contentArea = document.getElementById('contentArea');
+                contentArea.innerHTML = '<div class="loading">正在加载OPML文件...</div>';
+                
+                try {
+                    // 尝试不同编码方式加载
+                    const response = await fetch('novels.opml');
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    // 尝试多种编码
+                    const encodings = ['utf-8', 'gbk', 'gb2312', 'big5'];
+                    let xmlText = '';
+                    
+                    // 先以 ArrayBuffer 方式获取原始数据
+                    const buffer = await response.arrayBuffer();
+                    
+                    for (const encoding of encodings) {
+                        try {
+                            const decoder = new TextDecoder(encoding);
+                            xmlText = decoder.decode(buffer);
+                            
+                            // 检查是否包含中文字符
+                            if (this.containsChinese(xmlText)) {
+                                console.log(`使用编码: ${encoding}`);
+                                break;
+                            }
+                        } catch (e) {
+                            continue;
+                        }
+                    }
+                    
+                    if (!this.containsChinese(xmlText)) {
+                        // 如果还是不行，尝试默认utf-8
+                        xmlText = new TextDecoder('utf-8').decode(buffer);
+                    }
+                    
+                    // 解析 XML
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                    
+                    // 检查解析错误
+                    const parserError = xmlDoc.querySelector('parsererror');
+                    if (parserError) {
+                        throw new Error('XML解析错误：' + parserError.textContent);
+                    }
+                    
+                    // 提取信息
+                    this.extractData(xmlDoc);
+                    
+                } catch (error) {
+                    console.error('加载失败:', error);
+                    this.showError(`加载失败: ${error.message}`);
+                }
+            }
+            
+            containsChinese(text) {
+                // 检查是否包含中文字符
+                return /[\u4e00-\u9fff]/.test(text);
+            }
+            
+            extractData(xmlDoc) {
+                this.chapters = [];
+                const outlines = xmlDoc.getElementsByTagName('outline');
+                
+                // 查找小说信息
+                let novelInfo = null;
+                for (const outline of outlines) {
+                    if (outline.getAttribute('type') === 'novel') {
+                        novelInfo = {
+                            title: outline.getAttribute('text') || '未知小说',
+                            author: outline.getAttribute('author') || '未知作者',
+                            status: outline.getAttribute('status') || '未知状态',
+                            totalChapters: outline.getAttribute('totalChapters') || '0'
+                        };
+                        break;
+                    }
+                }
+                
+                // 提取章节
+                for (const outline of outlines) {
+                    if (outline.getAttribute('type') === 'chapter') {
+                        const chapter = {
+                            id: outline.getAttribute('chapterId') || '',
+                            title: outline.getAttribute('text') || '',
+                            url: outline.getAttribute('url') || '',
+                            filename: outline.getAttribute('filename') || ''
+                        };
+                        
+                        if (chapter.title && chapter.url) {
+                            this.chapters.push(chapter);
+                        }
+                    }
+                }
+                
+                // 按章节ID排序
+                this.chapters.sort((a, b) => {
+                    const idA = parseInt(a.id) || 0;
+                    const idB = parseInt(b.id) || 0;
+                    return idA - idB;
+                });
+                
+                this.filteredChapters = [...this.chapters];
+                this.render(novelInfo);
+            }
+            
+            render(novelInfo) {
+                const contentArea = document.getElementById('contentArea');
+                const statsArea = document.getElementById('stats');
+                
+                if (this.chapters.length === 0) {
+                    contentArea.innerHTML = '<div class="error">未找到章节数据</div>';
+                    return;
+                }
+                
+                // 显示小说信息
+                let html = '';
+                
+                if (novelInfo) {
+                    html += `
+                        <div class="novel-info">
+                            <h2>${novelInfo.title}</h2>
+                            <p>作者：${novelInfo.author} | 状态：${novelInfo.status}</p>
+                        </div>
+                    `;
+                }
+                
+                // 显示章节列表
+                html += '<div class="chapter-list">';
+                
+                this.filteredChapters.forEach(chapter => {
+                    html += `
+                        <div class="chapter-item">
+                            <a href="${chapter.url}" class="chapter-link" target="_blank">
+                                ${chapter.title}
+                            </a>
+                            <div class="chapter-id">第${chapter.id}章</div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                
+                contentArea.innerHTML = html;
+                
+                // 显示统计信息
+                statsArea.innerHTML = `
+                    共 ${this.chapters.length} 个章节 | 
+                    显示 ${this.filteredChapters.length} 个
+                `;
+            }
+            
+            searchChapters(keyword) {
+                if (!keyword.trim()) {
+                    this.filteredChapters = [...this.chapters];
+                } else {
+                    this.filteredChapters = this.chapters.filter(chapter => 
+                        chapter.title.includes(keyword) || 
+                        chapter.id.includes(keyword)
+                    );
+                }
+                
+                // 重新渲染
+                const novelInfo = this.chapters.length > 0 ? {
+                    title: "重生华娱，但绑定了罪犯系统",
+                    author: "未知作者",
+                    status: "连载中",
+                    totalChapters: this.chapters.length.toString()
+                } : null;
+                
+                this.render(novelInfo);
+            }
+            
+            exportList() {
+                const content = this.chapters.map(chapter => 
+                    `${chapter.id}. ${chapter.title}`
+                ).join('\n');
+                
+                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = '章节清单.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+            
+            showError(message) {
+                document.getElementById('contentArea').innerHTML = `
+                    <div class="error">
+                        <h3>错误</h3>
+                        <p>${message}</p>
+                        <p>可能的原因：</p>
+                        <ul>
+                            <li>OPML文件编码不正确</li>
+                            <li>文件路径错误</li>
+                            <li>XML格式有误</li>
+                        </ul>
+                        <button onclick="viewer.loadOPML()" class="control-btn">重试</button>
+                    </div>
+                `;
+            }
+        }
+        
+        // 创建实例
+        const viewer = new OPMLViewer();
+        
+        // 全局函数供按钮调用
+        window.loadOPML = () => viewer.loadOPML();
+        window.exportList = () => viewer.exportList();
+        window.searchChapters = (keyword) => viewer.searchChapters(keyword);
+        
+        // 添加键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'f') {
+                e.preventDefault();
+                document.querySelector('.search-input').focus();
+            }
+        });
+    </script>
+</body>
+</html>
