@@ -1,72 +1,155 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的小说站</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.8;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f9f9f9;
-        }
-        .header {
-            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-            color: white;
-            padding: 2rem;
-            border-radius: 10px;
-            margin-bottom: 2rem;
-            text-align: center;
-        }
-        .book-list {
-            display: grid;
-            gap: 1.5rem;
-        }
-        .book {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            cursor: pointer;
-        }
-        .book:hover {
-            transform: translateY(-2px);
-            transition: transform 0.3s;
-        }
-        footer {
-            margin-top: 3rem;
-            text-align: center;
-            color: #666;
-            padding: 1rem;
-            border-top: 1px solid #eee;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>读取 81784.txt 的小说</title>
+  <style>
+    :root{
+      --bg:#f8f8fb;
+      --card:#ffffff;
+      --accent:#2b6cb0;
+      --muted:#666;
+    }
+    body{font-family: "PingFang SC","Helvetica Neue",Arial, sans-serif; margin:0; background:var(--bg); color:#111;}
+    .wrap{max-width:900px; margin:28px auto; padding:18px;}
+    header{display:flex; gap:12px; align-items:center; margin-bottom:12px;}
+    h1{font-size:1.25rem; margin:0;}
+    .controls{margin-left:auto; display:flex; gap:8px; align-items:center;}
+    button{background:var(--accent); color:#fff; border:0; padding:8px 12px; border-radius:8px; cursor:pointer;}
+    button.secondary{background:#e6eef9; color:var(--accent);}
+    .card{background:var(--card); padding:16px; border-radius:10px; box-shadow:0 6px 18px rgba(20,20,40,0.06);}
+    #textArea{white-space:pre-wrap; line-height:1.8; font-size:18px; max-height:70vh; overflow:auto; padding-right:6px;}
+    .small{color:var(--muted); font-size:0.9rem;}
+    .file-input{display:none;}
+    footer{margin-top:12px; font-size:0.85rem; color:var(--muted);}
+    .toolbar{display:flex; gap:8px; align-items:center;}
+    input[type="range"]{width:140px;}
+  </style>
 </head>
 <body>
-    <div class="header">
-        <h1>📚 小说阅读站</h1>
-        <p>随时随地，畅享阅读</p>
-    </div>
-    
-    <div class="book-list">
-        <div class="book" onclick="window.location.href='chapter1.html'">
-            <h3>《星辰变》</h3>
-            <p>作者：我吃西红柿</p>
-            <p>状态：连载中 | 最新章节：第125章</p>
+  <div class="wrap">
+    <header>
+      <h1>小说阅读器 — 读取 <code>81784.txt</code></h1>
+      <div class="controls">
+        <div class="toolbar">
+          <label class="small">字号</label>
+          <input id="fontsize" type="range" min="12" max="32" value="18" />
+          <button id="toggleTheme" class="secondary">朗读 ▶</button>
+          <button id="reload">重新加载</button>
         </div>
-        <div class="book" onclick="window.location.href='book2.html'">
-            <h3>《凡人修仙传》</h3>
-            <p>作者：忘语</p>
-            <p>状态：已完结 | 共1000章</p>
-        </div>
+      </div>
+    </header>
+
+    <div class="card">
+      <div id="textArea" aria-live="polite">正在尝试从当前目录加载 <code>81784.txt</code> …</div>
+      <input id="filePicker" class="file-input" type="file" accept=".txt,text/plain" />
     </div>
-    
+
     <footer>
-        <p>© 2024 我的小说站 | 使用 GitHub Pages 部署</p>
-        <p>访问地址：https://你的用户名.github.io/novel-website</p>
+      <div class="small">提示：如果你直接用 <code>file://</code> 打开页面，部分浏览器会阻止脚本直接 fetch 本地文件。这种情况下会显示一个 “选择文件” 按钮来手动打开 <code>81784.txt</code>。如在本地搭建静态服务器（推荐）可避免此限制：<code>python -m http.server 8000</code>，然后访问 <code>http://localhost:8000/read_81784.html</code>。</div>
     </footer>
+  </div>
+
+  <script>
+    const textArea = document.getElementById('textArea');
+    const filePicker = document.getElementById('filePicker');
+    const fontsize = document.getElementById('fontsize');
+    const reloadBtn = document.getElementById('reload');
+    const toggleThemeBtn = document.getElementById('toggleTheme');
+
+    let synth = window.speechSynthesis;
+    let utter = null;
+    let isReading = false;
+
+    // 根据滑块调整字号
+    fontsize.addEventListener('input', ()=> {
+      textArea.style.fontSize = fontsize.value + 'px';
+    });
+
+    // 重新加载尝试 fetch
+    reloadBtn.addEventListener('click', ()=> {
+      loadFromRelativePath();
+    });
+
+    // 朗读控制（使用 Web Speech API）
+    toggleThemeBtn.addEventListener('click', ()=> {
+      if(!('speechSynthesis' in window)){
+        alert('当前浏览器不支持 Web Speech API 朗读功能。');
+        return;
+      }
+      if(isReading){
+        synth.cancel();
+        isReading = false;
+        toggleThemeBtn.textContent = '朗读 ▶';
+      } else {
+        const text = textArea.innerText.trim();
+        if(!text){
+          alert('没有可以朗读的文本。');
+          return;
+        }
+        utter = new SpeechSynthesisUtterance(text);
+        // 可自定义 voice / rate / pitch:
+        utter.rate = 1.0;
+        utter.pitch = 1.0;
+        synth.speak(utter);
+        isReading = true;
+        toggleThemeBtn.textContent = '停止 ◼';
+        utter.onend = ()=> {
+          isReading = false;
+          toggleThemeBtn.textContent = '朗读 ▶';
+        };
+      }
+    });
+
+    // 当 fetch 失败时，显示文件选择控件
+    function showFilePickerHint(){
+      textArea.innerHTML = `
+        无法直接通过 fetch 加载 <code>81784.txt</code>（可能是浏览器的本地文件策略阻止）。
+        <br><br>
+        请点击下面的 “选择文件” 按钮，或者在命令行启动本地静态服务器再重新加载页面。
+        <br><br>
+        <button id="openFileBtn">选择文件</button>
+      `;
+      document.getElementById('openFileBtn').addEventListener('click', ()=> filePicker.click());
+    }
+
+    // 监听用户选择文件
+    filePicker.addEventListener('change', (ev)=>{
+      const f = ev.target.files && ev.target.files[0];
+      if(!f) return;
+      const reader = new FileReader();
+      reader.onload = (e)=>{
+        textArea.textContent = e.target.result;
+        // 将文件名显示在标题处（轻度提示）
+        document.title = f.name + ' — 小说阅读器';
+      };
+      reader.onerror = ()=> {
+        alert('读取文件出错');
+      };
+      reader.readAsText(f, 'utf-8');
+    });
+
+    // 先尝试从相对路径加载（适用于服务器托管或允许的浏览器环境）
+    async function loadFromRelativePath(){
+      textArea.textContent = '正在尝试通过 fetch 读取 /81784.txt ...';
+      try {
+        const resp = await fetch('81784.txt', {cache: "no-store"});
+        if(!resp.ok){
+          throw new Error('HTTP ' + resp.status);
+        }
+        // 尝试以 text 读取
+        const txt = await resp.text();
+        textArea.textContent = txt;
+        document.title = '81784.txt — 小说阅读器';
+      } catch (err){
+        console.warn('fetch 失败：', err);
+        showFilePickerHint();
+      }
+    }
+
+    // 页面加载时立即尝试
+    loadFromRelativePath();
+  </script>
 </body>
 </html>
