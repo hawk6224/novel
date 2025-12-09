@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>带语音朗读的小说阅读器</title>
+    <title>多小说语音阅读器</title>
     <style>
         :root {
             --primary-color: #3498db;
             --secondary-color: #2c3e50;
+            --novel-color: #9b59b6;
             --bg-color: #f8f9fa;
         }
         
@@ -26,7 +27,7 @@
         
         .container {
             display: grid;
-            grid-template-columns: 300px 1fr;
+            grid-template-columns: 250px 1fr;
             height: 100vh;
             gap: 20px;
             padding: 20px;
@@ -42,23 +43,14 @@
             flex-direction: column;
         }
         
-        .sidebar-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-        }
-        
-        .sidebar-header h2 {
-            margin-bottom: 10px;
-        }
-        
-        .chapter-list {
-            flex: 1;
-            overflow-y: auto;
+        .novel-list {
             padding: 15px;
+            border-bottom: 1px solid #eee;
+            max-height: 40%;
+            overflow-y: auto;
         }
         
-        .chapter-item {
+        .novel-item {
             padding: 12px 15px;
             margin-bottom: 8px;
             background: #f8f9fa;
@@ -68,8 +60,40 @@
             transition: all 0.3s;
         }
         
+        .novel-item:hover {
+            background: #f3e6f8;
+            transform: translateX(5px);
+        }
+        
+        .novel-item.active {
+            background: #f3e6f8;
+            border-left-color: var(--novel-color);
+        }
+        
+        .novel-title {
+            color: var(--novel-color);
+            font-weight: 500;
+            margin-bottom: 3px;
+        }
+        
+        .chapter-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        
+        .chapter-item {
+            padding: 10px 12px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 6px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        
         .chapter-item:hover {
-            background: #e9ecef;
+            background: #e3f2fd;
             transform: translateX(5px);
         }
         
@@ -80,14 +104,14 @@
         }
         
         .chapter-title {
+            font-size: 14px;
             color: var(--secondary-color);
-            font-size: 16px;
-            margin-bottom: 3px;
         }
         
         .chapter-info {
             color: #666;
             font-size: 12px;
+            margin-top: 2px;
         }
         
         /* 右侧阅读区 */
@@ -111,13 +135,13 @@
             gap: 15px;
         }
         
-        .chapter-meta h1 {
+        .current-info h1 {
             font-size: 1.5em;
             color: var(--secondary-color);
             margin-bottom: 5px;
         }
         
-        .chapter-meta p {
+        .current-info p {
             color: #666;
             font-size: 14px;
         }
@@ -191,24 +215,65 @@
             min-width: 150px;
         }
         
+        .settings-btn {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            color: #666;
+            cursor: pointer;
+        }
+        
+        .settings-panel {
+            position: absolute;
+            top: 80px;
+            right: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 1000;
+            min-width: 200px;
+        }
+        
+        .setting-item {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .setting-item label {
+            color: #666;
+            font-size: 14px;
+        }
+        
         .content-container {
             flex: 1;
             overflow-y: auto;
             padding: 30px;
             font-size: 18px;
             line-height: 1.8;
+            user-select: text;
+            cursor: text;
         }
         
         .content-container p {
             margin-bottom: 1.5em;
             text-indent: 2em;
             transition: background 0.3s;
+            padding: 3px 0;
         }
         
         .reading-highlight {
             background: #fff9c4 !important;
             border-radius: 3px;
-            padding: 2px 0;
+        }
+        
+        .selected-text {
+            background: #cce5ff !important;
+            border-radius: 3px;
         }
         
         .loading {
@@ -225,10 +290,17 @@
             margin: 20px;
         }
         
+        .progress-container {
+            padding: 0 30px;
+            margin-top: 10px;
+        }
+        
         .progress-bar {
-            height: 4px;
+            height: 6px;
             background: #eee;
-            width: 100%;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 5px;
         }
         
         .progress {
@@ -238,11 +310,19 @@
             transition: width 0.3s;
         }
         
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+        }
+        
         .nav-controls {
             padding: 20px 30px;
             border-top: 1px solid #eee;
             display: flex;
             justify-content: space-between;
+            align-items: center;
         }
         
         .nav-btn {
@@ -263,6 +343,12 @@
         .nav-btn:disabled {
             background: #ccc;
             cursor: not-allowed;
+        }
+        
+        .auto-next {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         
         .status-bar {
@@ -306,28 +392,36 @@
     <div class="container">
         <!-- 左侧目录 -->
         <div class="sidebar">
-            <div class="sidebar-header">
-                <h2>重生华娱，但绑定了罪犯系统</h2>
-                <p>共184章</p>
+            <!-- 小说列表 -->
+            <div class="novel-list">
+                <h3 style="color: var(--novel-color); margin-bottom: 15px;">📚 小说列表</h3>
+                <div id="novelList">
+                    <div class="loading">加载小说中...</div>
+                </div>
             </div>
-            <div class="chapter-list" id="chapterList">
-                <div class="loading">加载目录中...</div>
+            
+            <!-- 章节列表 -->
+            <div class="chapter-list">
+                <h3 style="color: var(--primary-color); margin-bottom: 15px;">📖 章节列表</h3>
+                <div id="chapterList">
+                    <div class="loading">选择小说后显示章节</div>
+                </div>
             </div>
         </div>
         
         <!-- 右侧阅读区 -->
         <div class="reader-area">
             <div class="reader-header">
-                <div class="chapter-meta">
-                    <h1 id="currentChapterTitle">请选择章节</h1>
+                <div class="current-info">
+                    <h1 id="currentChapterTitle">请选择小说和章节</h1>
                     <p id="chapterStats">准备朗读</p>
                 </div>
                 
                 <div class="speech-controls">
                     <button class="speech-btn" id="playBtn" onclick="toggleSpeech()" title="播放/暂停" disabled>▶️</button>
                     <button class="speech-btn" onclick="stopSpeech()" title="停止" disabled>⏹️</button>
-                    <button class="speech-btn" onclick="prevParagraph()" title="上一段" disabled>⏮️</button>
-                    <button class="speech-btn" onclick="nextParagraph()" title="下一段" disabled>⏭️</button>
+                    <button class="speech-btn" onclick="rewindParagraph(5)" title="后退5秒">⏪</button>
+                    <button class="speech-btn" onclick="fastForwardParagraph(5)" title="快进5秒">⏩</button>
                     
                     <div class="rate-control">
                         <button class="rate-btn active" onclick="setRate(0.8)">0.8x</button>
@@ -339,31 +433,71 @@
                     <select class="voice-select" id="voiceSelect" onchange="changeVoice(this.value)" disabled>
                         <option value="">选择语音...</option>
                     </select>
+                    
+                    <button class="settings-btn" onclick="toggleSettings()">⚙️ 设置</button>
                 </div>
             </div>
             
-            <div class="progress-bar">
-                <div class="progress" id="progressBar"></div>
+            <!-- 设置面板 -->
+            <div class="settings-panel" id="settingsPanel">
+                <div class="setting-item">
+                    <label>自动下一章：</label>
+                    <input type="checkbox" id="autoNextChapter" checked>
+                </div>
+                <div class="setting-item">
+                    <label>高亮朗读行：</label>
+                    <input type="checkbox" id="highlightReading" checked>
+                </div>
+                <div class="setting-item">
+                    <label>从选中处开始读：</label>
+                    <input type="checkbox" id="readFromSelection" checked>
+                </div>
+                <div class="setting-item">
+                    <label>朗读完成提示音：</label>
+                    <input type="checkbox" id="playCompletionSound" checked>
+                </div>
             </div>
             
+            <!-- 进度条 -->
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress" id="progressBar"></div>
+                </div>
+                <div class="progress-info">
+                    <span id="currentTime">0:00</span>
+                    <span id="totalTime">0:00</span>
+                </div>
+            </div>
+            
+            <!-- 内容区域 -->
             <div class="content-container" id="contentContainer">
                 <div class="loading">
-                    <p>👈 请从左侧选择章节开始阅读</p>
+                    <p>👈 请从左侧选择小说和章节</p>
                     <p style="margin-top: 20px; color: #777;">
                         支持功能：<br>
-                        • 语音朗读整章内容<br>
-                        • 实时高亮朗读位置<br>
-                        • 调节朗读语速<br>
-                        • 选择不同语音
+                        • 多本小说切换<br>
+                        • 从选中文字开始朗读<br>
+                        • 快进/后退控制<br>
+                        • 自动下一章<br>
+                        • 语音朗读整章内容
                     </p>
                 </div>
             </div>
             
+            <!-- 导航控制 -->
             <div class="nav-controls">
-                <button class="nav-btn" id="prevChapterBtn" onclick="prevChapter()" disabled>上一章</button>
-                <button class="nav-btn" id="nextChapterBtn" onclick="nextChapter()" disabled>下一章</button>
+                <div>
+                    <button class="nav-btn" id="prevChapterBtn" onclick="prevChapter()" disabled>← 上一章</button>
+                    <button class="nav-btn" id="nextChapterBtn" onclick="nextChapter()" disabled>下一章 →</button>
+                </div>
+                
+                <div class="auto-next">
+                    <input type="checkbox" id="autoNextCheckbox" checked>
+                    <label for="autoNextCheckbox">朗读完自动下一章</label>
+                </div>
             </div>
             
+            <!-- 状态栏 -->
             <div class="status-bar">
                 <span id="readingStatus">就绪</span>
                 <span id="progressText">0%</span>
@@ -371,14 +505,19 @@
         </div>
     </div>
     
+    <!-- 完成提示音 -->
+    <audio id="completionSound" src="https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3" preload="auto"></audio>
+    
     <script>
-        class NovelReaderWithSpeech {
+        class MultiNovelSpeechReader {
             constructor() {
-                this.chapters = [];  // 章节列表
-                this.currentChapterIndex = -1;  // 当前章节索引
-                this.currentContent = '';  // 当前章节内容
-                this.paragraphs = [];  // 分割后的段落
-                this.currentParagraphIndex = 0;  // 当前朗读段落索引
+                this.novels = [];           // 所有小说
+                this.chapters = {};         // 按小说分组的章节
+                this.currentNovel = null;   // 当前小说
+                this.currentChapter = null; // 当前章节
+                this.currentContent = '';   // 当前章节内容
+                this.paragraphs = [];       // 分割后的段落
+                this.currentParaIndex = 0;  // 当前朗读段落索引
                 
                 // 语音相关
                 this.speechSynthesis = window.speechSynthesis;
@@ -388,6 +527,19 @@
                 this.voices = [];
                 this.selectedVoice = null;
                 this.isSpeechSupported = 'speechSynthesis' in window;
+                
+                // 进度控制
+                this.selectionStartIndex = 0;  // 选中文本的起始段落索引
+                this.startTime = 0;           // 朗读开始时间
+                this.currentTime = 0;         // 当前朗读时间
+                
+                // 设置
+                this.settings = {
+                    autoNextChapter: true,
+                    highlightReading: true,
+                    readFromSelection: true,
+                    playCompletionSound: true
+                };
                 
                 this.init();
             }
@@ -401,80 +553,144 @@
                     this.showSpeechError();
                 }
                 
-                // 加载章节目录
-                await this.loadChapters();
+                // 加载小说数据
+                await this.loadNovels();
+                
+                // 加载设置
+                this.loadSettings();
                 
                 // 设置事件监听
                 this.setupEventListeners();
             }
             
-            async loadChapters() {
+            async loadNovels() {
                 try {
-                    // 加载OPML文件
                     const response = await fetch('novels.opml');
                     const xmlText = await response.text();
-                    
-                    // 解析XML
                     const parser = new DOMParser();
                     const xmlDoc = parser.parseFromString(xmlText, "text/xml");
                     
-                    // 提取章节信息
-                    this.extractChapters(xmlDoc);
+                    // 提取小说和章节信息
+                    this.extractNovelsAndChapters(xmlDoc);
                     
-                    // 渲染目录
-                    this.renderChapterList();
+                    // 渲染小说列表
+                    this.renderNovelList();
                     
                 } catch (error) {
-                    console.error('加载章节失败:', error);
-                    document.getElementById('chapterList').innerHTML = 
-                        '<div class="error">加载目录失败</div>';
+                    console.error('加载小说失败:', error);
+                    document.getElementById('novelList').innerHTML = 
+                        '<div class="error">加载小说列表失败</div>';
                 }
             }
             
-            extractChapters(xmlDoc) {
-                this.chapters = [];
-                const outlines = xmlDoc.getElementsByTagName('outline');
+            extractNovelsAndChapters(xmlDoc) {
+                this.novels = [];
+                this.chapters = {};
                 
-                // 根据你的OPML结构提取章节
+                const outlines = xmlDoc.getElementsByTagName('outline');
+                let currentNovel = null;
+                
                 for (const outline of outlines) {
                     const text = outline.getAttribute('text');
-                    const url = outline.getAttribute('url');
                     const type = outline.getAttribute('type');
+                    const url = outline.getAttribute('url');
                     
-                    // 匹配章节（包含"第X章"的文本）
-                    if (text && text.includes('章') && url && url.endsWith('.txt')) {
-                        // 提取章节编号
+                    if (type === 'novel') {
+                        // 新小说
+                        const novelId = outline.getAttribute('novelId') || text;
+                        currentNovel = {
+                            id: novelId,
+                            title: text,
+                            author: outline.getAttribute('author') || '未知作者',
+                            cover: outline.getAttribute('cover') || '',
+                            description: outline.getAttribute('description') || '',
+                            status: outline.getAttribute('status') || '连载中'
+                        };
+                        this.novels.push(currentNovel);
+                        this.chapters[novelId] = [];
+                    } 
+                    else if (type === 'chapter' && url && currentNovel) {
+                        // 章节
+                        const match = text.match(/第(\d+)章/);
+                        const chapterNum = match ? parseInt(match[1]) : this.chapters[currentNovel.id].length + 1;
+                        
+                        this.chapters[currentNovel.id].push({
+                            id: chapterNum,
+                            title: text,
+                            url: url.startsWith('http') ? url : `86723/${url}`,
+                            novelId: currentNovel.id
+                        });
+                    }
+                    else if (text && text.includes('章') && url) {
+                        // 如果没有明确的type，但看起来像章节
                         const match = text.match(/第(\d+)章/);
                         const chapterNum = match ? parseInt(match[1]) : 0;
                         
-                        // 构建完整URL
-                        const fullUrl = url.startsWith('http') ? url : `${url}`;
+                        // 如果没有当前小说，创建一个
+                        if (!currentNovel) {
+                            const novelId = 'default';
+                            currentNovel = {
+                                id: novelId,
+                                title: '重生华娱，但绑定了罪犯系统',
+                                author: '未知作者',
+                                status: '连载中'
+                            };
+                            this.novels.push(currentNovel);
+                            this.chapters[novelId] = [];
+                        }
                         
-                        this.chapters.push({
+                        this.chapters[currentNovel.id].push({
                             id: chapterNum,
                             title: text,
-                            url: fullUrl,
-                            filename: url
+                            url: url.startsWith('http') ? url : `86723/${url}`,
+                            novelId: currentNovel.id
                         });
                     }
                 }
                 
-                // 按章节编号排序
-                this.chapters.sort((a, b) => a.id - b.id);
+                // 为每本小说的章节排序
+                Object.values(this.chapters).forEach(chapters => {
+                    chapters.sort((a, b) => a.id - b.id);
+                });
                 
+                console.log('加载的小说:', this.novels);
                 console.log('加载的章节:', this.chapters);
             }
             
-            renderChapterList() {
-                const container = document.getElementById('chapterList');
+            renderNovelList() {
+                const container = document.getElementById('novelList');
                 
-                if (this.chapters.length === 0) {
-                    container.innerHTML = '<div class="error">未找到章节</div>';
+                if (this.novels.length === 0) {
+                    container.innerHTML = '<div class="error">未找到小说</div>';
                     return;
                 }
                 
-                const html = this.chapters.map(chapter => `
-                    <div class="chapter-item" data-index="${chapter.id}" onclick="reader.loadChapter(${chapter.id})">
+                const html = this.novels.map((novel, index) => `
+                    <div class="novel-item" data-novel-id="${novel.id}" onclick="reader.selectNovel('${novel.id}')">
+                        <div class="novel-title">${novel.title}</div>
+                        <div class="chapter-info">${novel.author} | ${novel.status}</div>
+                    </div>
+                `).join('');
+                
+                container.innerHTML = html;
+                
+                // 默认选择第一本小说
+                if (this.novels.length > 0) {
+                    this.selectNovel(this.novels[0].id);
+                }
+            }
+            
+            renderChapterList(novelId) {
+                const container = document.getElementById('chapterList');
+                const chapters = this.chapters[novelId] || [];
+                
+                if (chapters.length === 0) {
+                    container.innerHTML = '<div class="error">该小说暂无章节</div>';
+                    return;
+                }
+                
+                const html = chapters.map(chapter => `
+                    <div class="chapter-item" data-chapter-id="${chapter.id}" onclick="reader.selectChapter('${chapter.novelId}', ${chapter.id})">
                         <div class="chapter-title">${chapter.title}</div>
                         <div class="chapter-info">第${chapter.id}章</div>
                     </div>
@@ -483,13 +699,47 @@
                 container.innerHTML = html;
             }
             
-            async loadChapter(chapterId) {
-                // 找到章节索引
-                const chapterIndex = this.chapters.findIndex(ch => ch.id === chapterId);
-                if (chapterIndex === -1) return;
+            selectNovel(novelId) {
+                const novel = this.novels.find(n => n.id === novelId);
+                if (!novel) return;
                 
-                // 更新UI状态
-                this.updateChapterSelection(chapterIndex);
+                // 更新选中状态
+                document.querySelectorAll('.novel-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                document.querySelector(`.novel-item[data-novel-id="${novelId}"]`).classList.add('active');
+                
+                this.currentNovel = novel;
+                this.renderChapterList(novelId);
+                
+                // 清空当前内容
+                this.currentChapter = null;
+                this.currentContent = '';
+                this.paragraphs = [];
+                this.currentParaIndex = 0;
+                
+                document.getElementById('contentContainer').innerHTML = 
+                    '<div class="loading">请选择章节开始阅读</div>';
+                document.getElementById('currentChapterTitle').textContent = novel.title;
+                document.getElementById('chapterStats').textContent = '选择章节开始阅读';
+                
+                this.disableControls();
+            }
+            
+            async selectChapter(novelId, chapterId) {
+                const chapters = this.chapters[novelId] || [];
+                const chapter = chapters.find(ch => ch.id === chapterId);
+                if (!chapter) return;
+                
+                // 更新选中状态
+                document.querySelectorAll('.chapter-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                document.querySelector(`.chapter-item[data-chapter-id="${chapterId}"]`).classList.add('active');
+                
+                this.currentChapter = chapter;
+                this.currentParaIndex = 0;
+                this.selectionStartIndex = 0;
                 
                 // 显示加载状态
                 document.getElementById('contentContainer').innerHTML = 
@@ -497,7 +747,6 @@
                 
                 try {
                     // 加载章节内容
-                    const chapter = this.chapters[chapterIndex];
                     const response = await fetch(chapter.url);
                     
                     if (!response.ok) {
@@ -506,22 +755,24 @@
                     
                     const content = await response.text();
                     this.currentContent = content;
-                    this.currentChapterIndex = chapterIndex;
                     
                     // 分割段落
                     this.paragraphs = content.split('\n').filter(p => p.trim());
-                    this.currentParagraphIndex = 0;
                     
                     // 显示内容
                     this.displayContent();
                     
                     // 更新章节信息
-                    document.getElementById('currentChapterTitle').textContent = chapter.title;
+                    document.getElementById('currentChapterTitle').textContent = 
+                        `${this.currentNovel.title} - ${chapter.title}`;
                     document.getElementById('chapterStats').textContent = 
-                        `共 ${this.paragraphs.length} 段，约 ${content.length} 字`;
+                        `第${chapter.id}章，共 ${this.paragraphs.length} 段，约 ${content.length} 字`;
                     
                     // 启用控制按钮
                     this.enableControls();
+                    
+                    // 更新导航按钮状态
+                    this.updateNavButtons();
                     
                 } catch (error) {
                     console.error('加载章节失败:', error);
@@ -541,6 +792,59 @@
                 
                 // 滚动到顶部
                 container.scrollTop = 0;
+                
+                // 添加文本选择监听
+                container.addEventListener('mouseup', () => {
+                    this.handleTextSelection();
+                });
+            }
+            
+            handleTextSelection() {
+                const selection = window.getSelection();
+                const selectedText = selection.toString().trim();
+                
+                if (selectedText && this.settings.readFromSelection) {
+                    // 找到选中文本所在的段落
+                    const container = document.getElementById('contentContainer');
+                    const paragraphs = container.getElementsByTagName('p');
+                    
+                    for (let i = 0; i < paragraphs.length; i++) {
+                        if (paragraphs[i].contains(selection.anchorNode) || 
+                            paragraphs[i].contains(selection.focusNode)) {
+                            this.selectionStartIndex = i;
+                            break;
+                        }
+                    }
+                    
+                    // 高亮选中的文本
+                    this.highlightSelectedText(selectedText);
+                    
+                    // 提示可以从选中处开始朗读
+                    this.updateStatus(`已选中文本，可从第${this.selectionStartIndex + 1}段开始朗读`);
+                }
+            }
+            
+            highlightSelectedText(text) {
+                // 清除之前的高亮
+                this.clearHighlight('.selected-text');
+                
+                // 高亮选中的文本
+                const container = document.getElementById('contentContainer');
+                const paragraphs = container.getElementsByTagName('p');
+                
+                for (let i = 0; i < paragraphs.length; i++) {
+                    const para = paragraphs[i];
+                    if (para.textContent.includes(text)) {
+                        const html = para.innerHTML;
+                        const highlighted = html.replace(
+                            new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                            `<span class="selected-text">${text}</span>`
+                        );
+                        para.innerHTML = highlighted;
+                        para.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        break;
+                    }
+                }
             }
             
             async loadVoices() {
@@ -580,14 +884,18 @@
                 });
             }
             
-            startReading() {
+            startReading(startIndex = null) {
                 if (!this.isSpeechSupported || this.paragraphs.length === 0) return;
                 
-                if (this.currentParagraphIndex >= this.paragraphs.length) {
-                    this.currentParagraphIndex = 0;
+                // 确定开始朗读的位置
+                let startParaIndex = startIndex !== null ? startIndex : this.selectionStartIndex;
+                if (startParaIndex >= this.paragraphs.length) {
+                    startParaIndex = 0;
                 }
                 
-                const text = this.paragraphs[this.currentParagraphIndex];
+                this.currentParaIndex = startParaIndex;
+                
+                const text = this.paragraphs[this.currentParaIndex];
                 if (!text) {
                     this.nextParagraph();
                     return;
@@ -609,22 +917,42 @@
                     this.currentUtterance.voice = this.selectedVoice;
                 }
                 
+                // 记录开始时间
+                this.startTime = Date.now();
+                
                 // 高亮当前段落
-                this.highlightCurrentParagraph();
+                if (this.settings.highlightReading) {
+                    this.highlightCurrentParagraph();
+                }
                 
                 // 事件监听
                 this.currentUtterance.onstart = () => {
                     this.isPlaying = true;
                     this.updatePlayButton();
                     this.updateStatus('正在朗读...');
-                    this.updateProgress();
+                    this.startProgressTimer();
                 };
                 
                 this.currentUtterance.onend = () => {
                     this.isPlaying = false;
-                    this.nextParagraph();
-                    this.updatePlayButton();
+                    
+                    // 计算朗读时间
+                    const endTime = Date.now();
+                    const duration = (endTime - this.startTime) / 1000;
+                    this.currentTime += duration;
+                    
+                    // 更新进度
                     this.updateProgress();
+                    
+                    // 是否继续下一段
+                    if (this.currentParaIndex < this.paragraphs.length - 1) {
+                        setTimeout(() => this.nextParagraph(), 500);
+                    } else {
+                        // 本章朗读完成
+                        this.onChapterComplete();
+                    }
+                    
+                    this.updatePlayButton();
                 };
                 
                 this.currentUtterance.onerror = (event) => {
@@ -652,7 +980,17 @@
                         this.updateStatus('已暂停');
                     }
                 } else {
-                    this.startReading();
+                    // 检查是否有选中的文本
+                    const selection = window.getSelection();
+                    const selectedText = selection.toString().trim();
+                    
+                    if (selectedText && this.settings.readFromSelection) {
+                        // 从选中处开始朗读
+                        this.startReading(this.selectionStartIndex);
+                    } else {
+                        // 从当前位置开始朗读
+                        this.startReading();
+                    }
                 }
                 
                 this.updatePlayButton();
@@ -662,8 +1000,8 @@
                 if (this.speechSynthesis.speaking) {
                     this.speechSynthesis.cancel();
                     this.isPlaying = false;
-                    this.currentParagraphIndex = 0;
-                    this.clearHighlight();
+                    this.currentTime = 0;
+                    this.clearHighlight('.reading-highlight');
                     this.updatePlayButton();
                     this.updateStatus('已停止');
                     this.resetProgress();
@@ -671,22 +1009,74 @@
             }
             
             prevParagraph() {
-                if (this.currentParagraphIndex > 0) {
-                    this.currentParagraphIndex--;
+                if (this.currentParaIndex > 0) {
+                    this.currentParaIndex--;
                     this.stopReading();
                     setTimeout(() => this.startReading(), 100);
                 }
             }
             
             nextParagraph() {
-                if (this.currentParagraphIndex < this.paragraphs.length - 1) {
-                    this.currentParagraphIndex++;
+                if (this.currentParaIndex < this.paragraphs.length - 1) {
+                    this.currentParaIndex++;
                     this.stopReading();
                     setTimeout(() => this.startReading(), 100);
-                } else {
-                    // 到达结尾
-                    this.stopReading();
-                    this.updateStatus('本章朗读完成');
+                }
+            }
+            
+            rewindParagraph(seconds = 5) {
+                if (!this.isPlaying || !this.currentUtterance) return;
+                
+                this.stopReading();
+                if (this.currentParaIndex > 0) {
+                    this.currentParaIndex = Math.max(0, this.currentParaIndex - 1);
+                }
+                setTimeout(() => this.startReading(), 100);
+                this.updateStatus(`后退 ${seconds} 秒`);
+            }
+            
+            fastForwardParagraph(seconds = 5) {
+                if (!this.isPlaying || !this.currentUtterance) return;
+                
+                this.stopReading();
+                if (this.currentParaIndex < this.paragraphs.length - 1) {
+                    this.currentParaIndex = Math.min(this.paragraphs.length - 1, this.currentParaIndex + 1);
+                }
+                setTimeout(() => this.startReading(), 100);
+                this.updateStatus(`快进 ${seconds} 秒`);
+            }
+            
+            onChapterComplete() {
+                this.updateStatus('本章朗读完成');
+                this.resetProgress();
+                
+                // 播放完成提示音
+                if (this.settings.playCompletionSound) {
+                    const sound = document.getElementById('completionSound');
+                    sound.currentTime = 0;
+                    sound.play().catch(e => console.log('无法播放提示音:', e));
+                }
+                
+                // 自动下一章
+                if (this.settings.autoNextChapter) {
+                    setTimeout(() => this.nextChapter(), 2000);
+                }
+            }
+            
+            startProgressTimer() {
+                // 定期更新进度
+                this.progressInterval = setInterval(() => {
+                    if (this.isPlaying) {
+                        this.currentTime += 0.1;
+                        this.updateProgress();
+                    }
+                }, 100);
+            }
+            
+            stopProgressTimer() {
+                if (this.progressInterval) {
+                    clearInterval(this.progressInterval);
+                    this.progressInterval = null;
                 }
             }
             
@@ -722,10 +1112,10 @@
             
             highlightCurrentParagraph() {
                 // 清除之前的高亮
-                this.clearHighlight();
+                this.clearHighlight('.reading-highlight');
                 
                 // 高亮当前段落
-                const currentPara = document.getElementById(`para-${this.currentParagraphIndex}`);
+                const currentPara = document.getElementById(`para-${this.currentParaIndex}`);
                 if (currentPara) {
                     currentPara.classList.add('reading-highlight');
                     
@@ -737,60 +1127,79 @@
                 }
             }
             
-            clearHighlight() {
-                document.querySelectorAll('.reading-highlight').forEach(el => {
-                    el.classList.remove('reading-highlight');
+            clearHighlight(className) {
+                document.querySelectorAll(className).forEach(el => {
+                    el.classList.remove(className.split('.')[1]);
                 });
             }
             
             updateProgress() {
                 if (this.paragraphs.length === 0) return;
                 
-                const progress = ((this.currentParagraphIndex + 1) / this.paragraphs.length) * 100;
+                const progress = ((this.currentParaIndex + 1) / this.paragraphs.length) * 100;
                 document.getElementById('progressBar').style.width = `${progress}%`;
                 document.getElementById('progressText').textContent = 
-                    `${Math.round(progress)}% (${this.currentParagraphIndex + 1}/${this.paragraphs.length})`;
+                    `${Math.round(progress)}%`;
+                document.getElementById('currentTime').textContent = 
+                    `${this.currentParaIndex + 1}/${this.paragraphs.length}`;
+                document.getElementById('totalTime').textContent = 
+                    `${this.paragraphs.length} 段`;
             }
             
             resetProgress() {
+                this.stopProgressTimer();
                 document.getElementById('progressBar').style.width = '0%';
                 document.getElementById('progressText').textContent = '0%';
-            }
-            
-            updateChapterSelection(chapterIndex) {
-                // 更新目录选中状态
-                document.querySelectorAll('.chapter-item').forEach(item => {
-                    item.classList.remove('active');
-                });
-                
-                const selectedItem = document.querySelector(`.chapter-item[data-index="${this.chapters[chapterIndex].id}"]`);
-                if (selectedItem) {
-                    selectedItem.classList.add('active');
-                }
-                
-                // 更新导航按钮
-                document.getElementById('prevChapterBtn').disabled = chapterIndex <= 0;
-                document.getElementById('nextChapterBtn').disabled = chapterIndex >= this.chapters.length - 1;
+                document.getElementById('currentTime').textContent = '0:00';
             }
             
             prevChapter() {
-                if (this.currentChapterIndex > 0) {
-                    this.loadChapter(this.chapters[this.currentChapterIndex - 1].id);
+                if (!this.currentNovel || !this.currentChapter) return;
+                
+                const chapters = this.chapters[this.currentNovel.id] || [];
+                const currentIndex = chapters.findIndex(ch => ch.id === this.currentChapter.id);
+                
+                if (currentIndex > 0) {
+                    const prevChapter = chapters[currentIndex - 1];
                     this.stopReading();
+                    this.selectChapter(this.currentNovel.id, prevChapter.id);
                 }
             }
             
             nextChapter() {
-                if (this.currentChapterIndex < this.chapters.length - 1) {
-                    this.loadChapter(this.chapters[this.currentChapterIndex + 1].id);
+                if (!this.currentNovel || !this.currentChapter) return;
+                
+                const chapters = this.chapters[this.currentNovel.id] || [];
+                const currentIndex = chapters.findIndex(ch => ch.id === this.currentChapter.id);
+                
+                if (currentIndex < chapters.length - 1) {
+                    const nextChapter = chapters[currentIndex + 1];
                     this.stopReading();
+                    this.selectChapter(this.currentNovel.id, nextChapter.id);
                 }
+            }
+            
+            updateNavButtons() {
+                if (!this.currentNovel || !this.currentChapter) return;
+                
+                const chapters = this.chapters[this.currentNovel.id] || [];
+                const currentIndex = chapters.findIndex(ch => ch.id === this.currentChapter.id);
+                
+                document.getElementById('prevChapterBtn').disabled = currentIndex <= 0;
+                document.getElementById('nextChapterBtn').disabled = currentIndex >= chapters.length - 1;
             }
             
             enableControls() {
                 document.getElementById('playBtn').disabled = false;
                 document.querySelectorAll('.speech-btn:not(#playBtn)').forEach(btn => {
                     btn.disabled = false;
+                });
+            }
+            
+            disableControls() {
+                document.getElementById('playBtn').disabled = true;
+                document.querySelectorAll('.speech-btn:not(#playBtn)').forEach(btn => {
+                    btn.disabled = true;
                 });
             }
             
@@ -807,6 +1216,65 @@
             
             updateStatus(message) {
                 document.getElementById('readingStatus').textContent = message;
+                
+                // 3秒后清除临时状态
+                setTimeout(() => {
+                    if (document.getElementById('readingStatus').textContent === message) {
+                        document.getElementById('readingStatus').textContent = 
+                            this.isPlaying ? '正在朗读...' : '就绪';
+                    }
+                }, 3000);
+            }
+            
+            toggleSettings() {
+                const panel = document.getElementById('settingsPanel');
+                panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+            }
+            
+            loadSettings() {
+                // 从localStorage加载设置
+                const savedSettings = localStorage.getItem('novelReaderSettings');
+                if (savedSettings) {
+                    this.settings = { ...this.settings, ...JSON.parse(savedSettings) };
+                }
+                
+                // 更新UI
+                document.getElementById('autoNextChapter').checked = this.settings.autoNextChapter;
+                document.getElementById('highlightReading').checked = this.settings.highlightReading;
+                document.getElementById('readFromSelection').checked = this.settings.readFromSelection;
+                document.getElementById('playCompletionSound').checked = this.settings.playCompletionSound;
+                document.getElementById('autoNextCheckbox').checked = this.settings.autoNextChapter;
+                
+                // 绑定设置更改事件
+                document.getElementById('autoNextChapter').addEventListener('change', (e) => {
+                    this.settings.autoNextChapter = e.target.checked;
+                    this.saveSettings();
+                });
+                
+                document.getElementById('highlightReading').addEventListener('change', (e) => {
+                    this.settings.highlightReading = e.target.checked;
+                    this.saveSettings();
+                });
+                
+                document.getElementById('readFromSelection').addEventListener('change', (e) => {
+                    this.settings.readFromSelection = e.target.checked;
+                    this.saveSettings();
+                });
+                
+                document.getElementById('playCompletionSound').addEventListener('change', (e) => {
+                    this.settings.playCompletionSound = e.target.checked;
+                    this.saveSettings();
+                });
+                
+                document.getElementById('autoNextCheckbox').addEventListener('change', (e) => {
+                    this.settings.autoNextChapter = e.target.checked;
+                    document.getElementById('autoNextChapter').checked = e.target.checked;
+                    this.saveSettings();
+                });
+            }
+            
+            saveSettings() {
+                localStorage.setItem('novelReaderSettings', JSON.stringify(this.settings));
             }
             
             showSpeechError() {
@@ -829,34 +1297,61 @@
                             break;
                         case 'ArrowLeft':
                             if (e.ctrlKey) this.prevChapter();
+                            else if (e.altKey) this.rewindParagraph(5);
                             else this.prevParagraph();
                             break;
                         case 'ArrowRight':
                             if (e.ctrlKey) this.nextChapter();
+                            else if (e.altKey) this.fastForwardParagraph(5);
                             else this.nextParagraph();
                             break;
                         case 'Escape':
                             this.stopReading();
+                            const panel = document.getElementById('settingsPanel');
+                            if (panel.style.display === 'block') {
+                                panel.style.display = 'none';
+                            }
                             break;
+                        case '[':
+                            if (e.ctrlKey) this.rewindParagraph(10);
+                            break;
+                        case ']':
+                            if (e.ctrlKey) this.fastForwardParagraph(10);
+                            break;
+                    }
+                });
+                
+                // 点击其他地方关闭设置面板
+                document.addEventListener('click', (e) => {
+                    const panel = document.getElementById('settingsPanel');
+                    const settingsBtn = document.querySelector('.settings-btn');
+                    
+                    if (panel.style.display === 'block' && 
+                        !panel.contains(e.target) && 
+                        !settingsBtn.contains(e.target)) {
+                        panel.style.display = 'none';
                     }
                 });
             }
         }
         
         // 创建阅读器实例
-        const reader = new NovelReaderWithSpeech();
+        const reader = new MultiNovelSpeechReader();
         
         // 全局函数
         window.toggleSpeech = () => reader.toggleReading();
         window.stopSpeech = () => reader.stopReading();
         window.prevParagraph = () => reader.prevParagraph();
         window.nextParagraph = () => reader.nextParagraph();
+        window.rewindParagraph = (seconds) => reader.rewindParagraph(seconds);
+        window.fastForwardParagraph = (seconds) => reader.fastForwardParagraph(seconds);
         window.setRate = (rate) => reader.setRate(rate);
         window.changeVoice = (voiceIndex) => reader.changeVoice(voiceIndex);
         window.prevChapter = () => reader.prevChapter();
         window.nextChapter = () => reader.nextChapter();
+        window.toggleSettings = () => reader.toggleSettings();
         
-        // 使loadChapter可全局访问
+        // 使方法可全局访问
         window.reader = reader;
     </script>
 </body>
