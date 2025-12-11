@@ -2,100 +2,103 @@
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
-<title>阅读器</title>
+<title>小说阅读器</title>
 <style>
-    body { font-family: Arial; padding: 20px; line-height: 1.8; }
-    #content { white-space: pre-wrap; margin-bottom: 20px; }
-    button { padding: 8px 15px; margin-right: 8px; font-size: 16px; }
+    body { margin: 0; padding: 0; }
+    #readerFrame { width: 100%; height: 100vh; border: none; }
+    #nav { 
+        position: fixed;
+        bottom: 10px;
+        right: 10px; 
+        z-index: 9999;
+    }
+    button { padding: 8px 16px; font-size: 16px; }
 </style>
 </head>
 <body>
 
-<h2 id="chapter-title"></h2>
-<div id="content">正在加载章节内容...</div>
+<iframe id="readerFrame"></iframe>
 
-<button onclick="play()">朗读</button>
-<button onclick="pause()">暂停</button>
-<button onclick="nextBlock()">快进（下一段）</button>
+<!-- 底部导航（上一章 / 下一章） -->
+<div id="nav">
+    <button id="prevBtn">上一章</button>
+    <button id="nextBtn">下一章</button>
+</div>
 
 <script>
-let textBlocks = [];
-let blockIndex = 0;
-let utter = null;
-let toc = [];
-let currentFile = "";
+// =============== 解析 URL 参数 ===============
+const params = new URLSearchParams(location.search);
+let currentUrl = params.get("url");     // 如 "86723/第6章 劇本圍讀.txt"
+let chapterList = [];                   // 所有章节列表
+let currentIndex = -1;                  // 当前章节索引
 
-// 读取 URL 参数：?file=86723/第6章.txt
-const params = new URLSearchParams(window.location.search);
-currentFile = params.get("file");
-document.getElementById("chapter-title").innerText = currentFile;
+// 初始化 iframe
+const iframe = document.getElementById("readerFrame");
 
-// ------------------- 载入章节文本 -------------------
-fetch(currentFile)
-    .then(r => r.text())
-    .then(text => {
-        document.getElementById("content").innerText = text;
-        textBlocks = text.match(/[\s\S]{1,300}/g) || [];
-        blockIndex = 0;
-    });
-
-// ------------------- 读取 OPML，用于寻找下一章 -------------------
+// 加载 OPML 列表
 fetch("novels.opml")
-    .then(r => r.text())
-    .then(text => {
-        const xml = new DOMParser().parseFromString(text, "text/xml");
-        const novels = xml.querySelectorAll('outline[type="novel"]');
+    .then(res => res.text())
+    .then(xmlText => {
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(xmlText, "text/xml");
 
-        novels.forEach(novel => {
-            const chapters = novel.querySelectorAll('outline[type="file"]');
-            chapters.forEach(ch => {
-                toc.push(ch.getAttribute("url"));
-            });
-        });
+        // 获取所有章节
+        chapterList = Array.from(xml.querySelectorAll("outline[type='file']"))
+                           .map(x => x.getAttribute("url"));
+
+        // 找出当前章节的索引
+        currentIndex = chapterList.indexOf(currentUrl);
+
+        // 加载当前章节
+        loadChapter();
     });
 
-// ------------------- 朗读控制 -------------------
-function play() {
-    if (blockIndex >= textBlocks.length) {
-        loadNextChapter();
-        return;
-    }
 
-    stopCurrent();
+// =============== 加载章节内容到 iframe ===============
+function loadChapter() {
+    if (currentIndex < 0 || currentIndex >= chapterList.length) return;
 
-    utter = new SpeechSynthesisUtterance(textBlocks[blockIndex]);
-    utter.lang = "zh-CN";
-    utter.onend = () => {
-        blockIndex++;
-        play();
+    currentUrl = chapterList[currentIndex];
+
+    // 设置 iframe src
+    iframe.src = currentUrl;
+
+    // 自动下一章（监听 iframe 加载完成）
+    iframe.onload = () => {
+        // 监听页面滚动到底部
+        iframe.contentWindow.onscroll = () => {
+            const doc = iframe.contentDocument.documentElement;
+            if (doc.scrollTop + doc.clientHeight >= doc.scrollHeight - 5) {
+                // 底部 → 自动加载下一章
+                nextChapter();
+            }
+        };
     };
-    speechSynthesis.speak(utter);
+
+    // 更新浏览器 URL（方便刷新继续）
+    history.replaceState(null, "", "reader.html?url=" + encodeURIComponent(currentUrl));
 }
 
-function pause() {
-    speechSynthesis.pause();
-}
 
-function nextBlock() {
-    speechSynthesis.cancel();
-    blockIndex++;
-    play();
-}
+// =============== 上一章 / 下一章 按钮 ===============
+document.getElementById("prevBtn").onclick = () => {
+    if (currentIndex > 0) {
+        currentIndex--;
+        loadChapter();
+    }
+};
 
-function stopCurrent() {
-    if (utter) speechSynthesis.cancel();
-}
+document.getElementById("nextBtn").onclick = () => {
+    nextChapter();
+};
 
-// ------------------- 自动跳到下一章 -------------------
-function loadNextChapter() {
-    const idx = toc.indexOf(currentFile);
-    if (idx > -1 && idx < toc.length - 1) {
-        const next = toc[idx + 1];
-        window.location.href = `reader.html?file=${encodeURIComponent(next)}`;
-    } else {
-        alert("已经是最后一章啦");
+function nextChapter() {
+    if (currentIndex < chapterList.length - 1) {
+        currentIndex++;
+        loadChapter();
     }
 }
+
 </script>
 
 </body>
