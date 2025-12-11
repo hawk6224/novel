@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>阅读器</title>
+<style>
+    body { font-family: Arial; padding: 20px; line-height: 1.8; }
+    #content { white-space: pre-wrap; margin-bottom: 20px; }
+    button { padding: 8px 15px; margin-right: 8px; font-size: 16px; }
+</style>
+</head>
+<body>
+
+<h2 id="chapter-title"></h2>
+<div id="content">正在加载章节内容...</div>
+
+<button onclick="play()">朗读</button>
+<button onclick="pause()">暂停</button>
+<button onclick="nextBlock()">快进（下一段）</button>
+
+<script>
+let textBlocks = [];
+let blockIndex = 0;
+let utter = null;
+let toc = [];
+let currentFile = "";
+
+// 读取 URL 参数：?file=86723/第6章.txt
+const params = new URLSearchParams(window.location.search);
+currentFile = params.get("file");
+document.getElementById("chapter-title").innerText = currentFile;
+
+// ------------------- 载入章节文本 -------------------
+fetch(currentFile)
+    .then(r => r.text())
+    .then(text => {
+        document.getElementById("content").innerText = text;
+        textBlocks = text.match(/[\s\S]{1,300}/g) || [];
+        blockIndex = 0;
+    });
+
+// ------------------- 读取 OPML，用于寻找下一章 -------------------
+fetch("novels.opml")
+    .then(r => r.text())
+    .then(text => {
+        const xml = new DOMParser().parseFromString(text, "text/xml");
+        const novels = xml.querySelectorAll('outline[type="novel"]');
+
+        novels.forEach(novel => {
+            const chapters = novel.querySelectorAll('outline[type="file"]');
+            chapters.forEach(ch => {
+                toc.push(ch.getAttribute("url"));
+            });
+        });
+    });
+
+// ------------------- 朗读控制 -------------------
+function play() {
+    if (blockIndex >= textBlocks.length) {
+        loadNextChapter();
+        return;
+    }
+
+    stopCurrent();
+
+    utter = new SpeechSynthesisUtterance(textBlocks[blockIndex]);
+    utter.lang = "zh-CN";
+    utter.onend = () => {
+        blockIndex++;
+        play();
+    };
+    speechSynthesis.speak(utter);
+}
+
+function pause() {
+    speechSynthesis.pause();
+}
+
+function nextBlock() {
+    speechSynthesis.cancel();
+    blockIndex++;
+    play();
+}
+
+function stopCurrent() {
+    if (utter) speechSynthesis.cancel();
+}
+
+// ------------------- 自动跳到下一章 -------------------
+function loadNextChapter() {
+    const idx = toc.indexOf(currentFile);
+    if (idx > -1 && idx < toc.length - 1) {
+        const next = toc[idx + 1];
+        window.location.href = `reader.html?file=${encodeURIComponent(next)}`;
+    } else {
+        alert("已经是最后一章啦");
+    }
+}
+</script>
+
+</body>
+</html>
