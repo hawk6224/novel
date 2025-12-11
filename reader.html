@@ -4,12 +4,13 @@
 <meta charset="UTF-8">
 <title>小说阅读器</title>
 <style>
-    body { margin: 0; padding: 0; }
-    #readerFrame { width: 100%; height: 100vh; border: none; }
-    #nav { 
+    body { margin: 16px; font-size: 20px; line-height: 1.7; }
+    #content { white-space: pre-wrap; }
+    #title { font-size: 24px; font-weight: bold; margin-bottom: 20px; }
+    #nav {
         position: fixed;
         bottom: 10px;
-        right: 10px; 
+        right: 10px;
         z-index: 9999;
     }
     button { padding: 8px 16px; font-size: 16px; }
@@ -17,70 +18,79 @@
 </head>
 <body>
 
-<iframe id="readerFrame"></iframe>
+<div id="title"></div>
+<div id="content">正在加载章节内容...</div>
 
-<!-- 底部导航（上一章 / 下一章） -->
 <div id="nav">
     <button id="prevBtn">上一章</button>
     <button id="nextBtn">下一章</button>
 </div>
 
 <script>
-// =============== 解析 URL 参数 ===============
 const params = new URLSearchParams(location.search);
-let currentUrl = params.get("url");     // 如 "86723/第6章 劇本圍讀.txt"
-let chapterList = [];                   // 所有章节列表
-let currentIndex = -1;                  // 当前章节索引
+let currentUrl = params.get("url");   // 原始章节 URL（中文、空格等）
+let chapterList = [];
+let chapterTitles = [];
+let currentIndex = -1;
 
-// 初始化 iframe
-const iframe = document.getElementById("readerFrame");
-
-// 加载 OPML 列表
+// =============== 读取 OPML ===============
 fetch("novels.opml")
-    .then(res => res.text())
+    .then(r => r.text())
     .then(xmlText => {
         const parser = new DOMParser();
         const xml = parser.parseFromString(xmlText, "text/xml");
 
-        // 获取所有章节
-        chapterList = Array.from(xml.querySelectorAll("outline[type='file']"))
-                           .map(x => x.getAttribute("url"));
+        const outlines = xml.querySelectorAll("outline[type='file']");
+        outlines.forEach(x => {
+            const url = x.getAttribute("url");
+            const title = x.getAttribute("text");
+            chapterList.push(url);
+            chapterTitles.push(title);
+        });
 
-        // 找出当前章节的索引
-        currentIndex = chapterList.indexOf(currentUrl);
+        currentIndex = chapterList.indexOf(decodeURIComponent(currentUrl));
 
-        // 加载当前章节
+        if (currentIndex < 0) {
+            alert("找不到章节：" + currentUrl);
+            return;
+        }
+
         loadChapter();
     });
 
 
-// =============== 加载章节内容到 iframe ===============
+// =============== 加载章节内容（可被朗读工具读取） ===============
 function loadChapter() {
-    if (currentIndex < 0 || currentIndex >= chapterList.length) return;
+    const decodedUrl = decodeURIComponent(chapterList[currentIndex]);
 
-    currentUrl = chapterList[currentIndex];
+    // 修复中文 URL：要使用 encodeURI，而不是 encodeURIComponent（避免把 / 编码）
+    const safeUrl = encodeURI(decodedUrl);
 
-    // 设置 iframe src
-    iframe.src = currentUrl;
+    document.getElementById("title").innerText = chapterTitles[currentIndex];
+    document.getElementById("content").innerText = "加载中…";
 
-    // 自动下一章（监听 iframe 加载完成）
-    iframe.onload = () => {
-        // 监听页面滚动到底部
-        iframe.contentWindow.onscroll = () => {
-            const doc = iframe.contentDocument.documentElement;
-            if (doc.scrollTop + doc.clientHeight >= doc.scrollHeight - 5) {
-                // 底部 → 自动加载下一章
-                nextChapter();
-            }
-        };
-    };
+    fetch(safeUrl)
+        .then(r => r.text())
+        .then(text => {
+            document.getElementById("content").innerText = text;
 
-    // 更新浏览器 URL（方便刷新继续）
-    history.replaceState(null, "", "reader.html?url=" + encodeURIComponent(currentUrl));
+            history.replaceState(null, "", "reader.html?url=" + encodeURIComponent(chapterList[currentIndex]));
+
+            // 自动下一章：监听滚动
+            window.onscroll = () => {
+                const bottom = document.documentElement.scrollTop + window.innerHeight;
+                if (bottom >= document.documentElement.scrollHeight - 10) {
+                    nextChapter();
+                }
+            };
+        })
+        .catch(err => {
+            document.getElementById("content").innerText = "读取失败：" + safeUrl;
+        });
 }
 
 
-// =============== 上一章 / 下一章 按钮 ===============
+// =============== 上一章 / 下一章按钮 ===============
 document.getElementById("prevBtn").onclick = () => {
     if (currentIndex > 0) {
         currentIndex--;
@@ -98,7 +108,6 @@ function nextChapter() {
         loadChapter();
     }
 }
-
 </script>
 
 </body>
